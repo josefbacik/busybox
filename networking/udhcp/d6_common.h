@@ -84,6 +84,11 @@ struct d6_option {
 #define D6_OPT_IA_PD         25
 #define D6_OPT_IAPREFIX      26
 
+#define D6_OPT_BOOTFILE_URL  59
+
+/* Adjust this as we add support for new dhcp6 options */
+#define D6_OPT_END 60
+
 /*** Other shared functions ***/
 
 struct client6_data_t {

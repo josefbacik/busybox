@@ -289,17 +289,44 @@ static uint8_t *init_d6_packet(struct d6_packet *packet, char type, uint32_t xid
 
 static uint8_t *add_d6_client_options(uint8_t *ptr)
 {
+	uint8_t *orig = ptr;
+	uint16_t *val = (uint16_t *)ptr;
+	int i, count = 0;;
+
+	/*
+	 * We want to fill out the options first and then go back and update the
+	 * option len for the packet, it looks like this
+
+	   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	   |           OPTION_ORO          |           option-len          |
+	   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	   |    requested-option-code-1    |    requested-option-code-2    |
+	   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	   |                              ...                              |
+	   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+	 * So we just adjust ptr by 4 octets, fill in our options and then set the
+	 * option-len to 2 * # of opts, as per RFC 3315 Section 22.7.
+	 */
+	ptr += 4;
+	for (i = 1; i < D6_OPT_END; i++) {
+		if (client_config.opt_mask[i >> 3] & (1 << (i & 7))) {
+			uint16_t opt = htons(i);
+			bb_error_msg("requestion option %d", i);
+			ptr = d6_store_blob(ptr, &opt, sizeof(opt));
+			count++;
+		}
+	}
+
+	if (count) {
+		*val = htons(D6_OPT_ORO);
+		val++;
+		*val = htons(count * 2);
+	} else {
+		ptr = orig;
+	}
+
 	return ptr;
-	//uint8_t c;
-	//int i, end, len;
-
-	/* Add a "param req" option with the list of options we'd like to have
-	 * from stubborn DHCP servers. Pull the data from the struct in common.c.
-	 * No bounds checking because it goes towards the head of the packet. */
-	//...
-
-	/* Add -x options if any */
-	//...
 }
 
 static int d6_mcast_from_client_config_ifindex(struct d6_packet *packet, uint8_t *end)
@@ -972,10 +999,8 @@ int udhcpc6_main(int argc UNUSED_PARAM, char **argv)
 	while (list_O) {
 		char *optstr = llist_pop(&list_O);
 		unsigned n = bb_strtou(optstr, NULL, 0);
-		if (errno || n > 254) {
-			n = udhcp_option_idx(optstr);
-			n = dhcp_optflags[n].code;
-		}
+		if (errno || n > 254 || !n)
+			continue;
 		client_config.opt_mask[n >> 3] |= 1 << (n & 7);
 	}
 	if (!(opt & OPT_o)) {
