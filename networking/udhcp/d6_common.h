@@ -91,7 +91,7 @@ struct client6_data_t {
 	struct d6_option *ia_na;
 	char **env_ptr;
 	unsigned env_idx;
-};
+} FIX_ALIASING;
 
 #define client6_data (*(struct client6_data_t*)(&bb_common_bufsiz1[COMMON_BUFSIZE - sizeof(struct client6_data_t)]))
 

@@ -402,6 +402,7 @@ static int d6_mcast_from_client_config_ifindex(struct d6_packet *packet, uint8_t
 static NOINLINE int send_d6_discover(uint32_t xid, struct in6_addr *requested_ipv6)
 {
 	struct d6_packet packet;
+	uint32_t *iaid;
 	uint8_t *opt_ptr;
 	unsigned len;
 
@@ -414,7 +415,8 @@ static NOINLINE int send_d6_discover(uint32_t xid, struct in6_addr *requested_ip
 	client6_data.ia_na = xzalloc(len);
 	client6_data.ia_na->code = D6_OPT_IA_NA;
 	client6_data.ia_na->len = len - 4;
-	*(uint32_t*)client6_data.ia_na->data = rand(); /* IAID */
+	iaid = (uint32_t *)client6_data.ia_na->data;
+	*iaid = rand(); /* IAID */
 	if (requested_ipv6) {
 		struct d6_option *iaaddr = (void*)(client6_data.ia_na->data + 4+4+4);
 		iaaddr->code = D6_OPT_IAADDR;
