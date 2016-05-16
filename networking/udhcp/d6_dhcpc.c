@@ -143,6 +143,7 @@ static void option_to_env(uint8_t *option, uint8_t *option_end)
 	int len_m4 = option_end - option - 4;
 	while (len_m4 >= 0) {
 		uint32_t v32;
+		char *url;
 		char ipv6str[sizeof("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")];
 
 		if (option[0] != 0 || option[2] != 0)
@@ -217,6 +218,13 @@ static void option_to_env(uint8_t *option, uint8_t *option_end)
 
 			sprint_nip6(ipv6str, option + 4 + 4 + 1);
 			*new_env() = xasprintf("ipv6prefix=%s/%u", ipv6str, (unsigned)(option[4 + 4]));
+			break;
+		case D6_OPT_BOOTFILE_URL:
+			url = xzalloc(option[3] + 1);
+			memcpy(url, option + 4, option[3]);
+			*new_env() = xasprintf("ipv6bootfileurl=%s", url);
+			free(url);
+			break;
 		}
 		option += 4 + option[3];
 		len_m4 -= 4 + option[3];
