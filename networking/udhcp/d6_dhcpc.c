@@ -297,6 +297,7 @@ static uint8_t *init_d6_packet(struct d6_packet *packet, char type, uint32_t xid
 
 static uint8_t *add_d6_client_options(uint8_t *ptr)
 {
+	struct d6_option_set *option;
 	uint8_t *orig = ptr;
 	uint16_t *val = (uint16_t *)ptr;
 	int i, count = 0;;
@@ -334,7 +335,96 @@ static uint8_t *add_d6_client_options(uint8_t *ptr)
 		ptr = orig;
 	}
 
+	option = client6_data.options;
+	while (option) {
+		ptr = d6_store_blob(ptr, option->data, option->len);
+		option = option->next;
+	}
 	return ptr;
+}
+
+struct d6_optstr {
+	const char *name;
+	uint16_t code;
+};
+
+static struct d6_optstr d6_option_strings[] = {
+	{ "userclass", D6_OPT_USER_CLASS },
+	{ NULL, 0 },
+};
+
+static uint16_t d6_optstr_to_code(char *optstr)
+{
+	struct d6_optstr *opt = d6_option_strings;
+
+	for (; opt->name; opt++) {
+		if (!strcmp(optstr, opt->name))
+			return opt->code;
+	}
+	return 0;
+}
+
+static void d6_str2optset(char *optstr)
+{
+	char *val;
+	uint8_t *ptr;
+	uint16_t code, tmp;
+	struct d6_option_set *new;
+
+	val = strchr(optstr, ':');
+	if (!val)
+		return;
+	*val = '\0';
+	val++;
+
+	code = bb_strtou(optstr, NULL, 0);
+	if (errno || code > 254 || !code) {
+		code = d6_optstr_to_code(optstr);
+		if (!code) {
+			bb_error_msg("unrecognized option %s", optstr);
+			return;
+		}
+	}
+
+	switch (code) {
+	case D6_OPT_USER_CLASS:
+/*   0                   1                   2                   3
+ *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |        OPTION_USER_CLASS      |          option-len           |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |          user class len       |                               |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+      user class string        |
+ * |                                                               |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * |                           ....                                |
+ * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ */
+		new = xmalloc(sizeof(*new));
+		new->len = strlen(val) + sizeof(uint16_t) * 3;
+		new->data = ptr = xmalloc(new->len);
+
+		/* Store the code. */
+		code = htons(code);
+		ptr = d6_store_blob(ptr, &code, sizeof(code));
+
+		/* Length of the user data. */
+		tmp = htons(strlen(val) + sizeof(uint16_t));
+		ptr = d6_store_blob(ptr, &tmp, sizeof(tmp));
+
+		/* Length of the user class string. */
+		tmp = htons(strlen(val));
+		ptr = d6_store_blob(ptr, &tmp, sizeof(tmp));
+
+		/* The user class string. */
+		ptr = d6_store_blob(ptr, val, strlen(val));
+		new->next = client6_data.options;
+		client6_data.options = new;
+		break;
+	default:
+		bb_error_msg("unimplemented option %s", optstr);
+		break;
+	}
 }
 
 static int d6_mcast_from_client_config_ifindex(struct d6_packet *packet, uint8_t *end)
@@ -1023,12 +1113,7 @@ int udhcpc6_main(int argc UNUSED_PARAM, char **argv)
 	}
 	while (list_x) {
 		char *optstr = llist_pop(&list_x);
-		char *colon = strchr(optstr, ':');
-		if (colon)
-			*colon = ' ';
-		/* now it looks similar to udhcpd's config file line:
-		 * "optname optval", using the common routine: */
-		udhcp_str2optset(optstr, &client_config.options);
+		d6_str2optset(optstr);
 	}
 
 	if (udhcp_read_interface(client_config.interface,

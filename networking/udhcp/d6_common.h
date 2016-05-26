@@ -91,9 +91,16 @@ struct d6_option {
 
 /*** Other shared functions ***/
 
+struct d6_option_set {
+	uint8_t *data;
+	uint16_t len;
+	struct d6_option_set *next;
+};
+
 struct client6_data_t {
 	struct d6_option *server_id;
 	struct d6_option *ia_na;
+	struct d6_option_set *options;
 	char **env_ptr;
 	unsigned env_idx;
 } FIX_ALIASING;
