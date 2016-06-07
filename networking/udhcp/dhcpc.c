@@ -903,14 +903,24 @@ static NOINLINE int udhcp_recv_raw_packet(struct dhcp_packet *dhcp_pkt, int fd)
 	bytes = ntohs(packet.ip.tot_len);
 
 	/* make sure its the right packet for us, and that it passes sanity checks */
-	if (packet.ip.protocol != IPPROTO_UDP
-	 || packet.ip.version != IPVERSION
-	 || packet.ip.ihl != (sizeof(packet.ip) >> 2)
-	 || packet.udp.dest != htons(CLIENT_PORT)
-	/* || bytes > (int) sizeof(packet) - can't happen */
-	 || ntohs(packet.udp.len) != (uint16_t)(bytes - sizeof(packet.ip))
-	) {
-		log1("unrelated/bogus packet, ignoring");
+	if (packet.ip.protocol != IPPROTO_UDP){
+		log1("unrelated/bogus packet, ignoring: packet.ip.protocol != IPPROTO_UDP");
+		return -2;
+	}
+	if (packet.ip.version != IPVERSION){
+		log1("unrelated/bogus packet, ignoring: packet.ip.version != IPVERSION");
+		return -2;
+	}
+	if (packet.ip.ihl != (sizeof(packet.ip) >> 2)){
+		log1("unrelated/bogus packet, ignoring: packet.ip.ihl != (sizeof(packet.ip) >> 2)");
+		return -2;
+	}
+	if (packet.udp.dest != htons(CLIENT_PORT)){
+		log1("unrelated/bogus packet, ignoring: packet.udp.dest != htons(CLIENT_PORT)");
+		return -2;
+	}
+	if (ntohs(packet.udp.len) != (uint16_t)(bytes - sizeof(packet.ip))){
+		log1("unrelated/bogus packet, ignoring: bad length");
 		return -2;
 	}
 
