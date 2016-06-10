@@ -739,13 +739,20 @@ static NOINLINE int d6_recv_raw_packet(struct in6_addr *peer_ipv6
 	bytes = sizeof(packet.ip6) + ntohs(packet.ip6.ip6_plen);
 
 	/* make sure its the right packet for us, and that it passes sanity checks */
-	if (packet.ip6.ip6_nxt != IPPROTO_UDP
-	 || (packet.ip6.ip6_vfc >> 4) != 6
-	 || packet.udp.dest != htons(CLIENT_PORT6)
-	/* || bytes > (int) sizeof(packet) - can't happen */
-	 || packet.udp.len != packet.ip6.ip6_plen
-	) {
-		log1("unrelated/bogus packet, ignoring");
+	if (packet.ip6.ip6_nxt != IPPROTO_UDP){
+		log1("unrelated/bogus packet, ignoring: packet.ip6.ip6_nxt != IPPROTO_UDP");
+		return -2;
+	}
+	if ((packet.ip6.ip6_vfc >> 4) != 6){
+		log1("unrelated/bogus packet, ignoring: packet.ip6.ip6_vfc >> 4) != 6");
+		return -2;
+	}
+	if (packet.udp.dest != htons(CLIENT_PORT6)){
+		log1("unrelated/bogus packet, ignoring: packet.udp.dest != htons(CLIENT_PORT6)");
+		return -2;
+	}
+	if (packet.udp.len != packet.ip6.ip6_plen){
+		log1("unrelated/bogus packet, ignoring: packet.udp.len != packet.ip6.ip6_plen");
 		return -2;
 	}
 
